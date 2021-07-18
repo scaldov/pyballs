@@ -21,8 +21,9 @@ class View:
         self.translate = np.array([0.0, 0.0])
 
     def set(self, w, h):
+        s = min(w, h)
         self.translate = np.array([w / 2, h / 2])
-        self.linear = np.array([[w / 2, 0.], [0., -h / 2]])
+        self.linear = np.array([[s / 2, 0.], [0., -s / 2]])
 
     def transform(self, v):
         return self.linear.dot(v) + self.translate
@@ -64,7 +65,7 @@ class Ball(Obj):
         self.mass *= self.radius**2
 
     def draw(self, painter, view):
-        r = view.translate * self.radius
+        r = view.linear.dot(np.array([self.radius, self.radius]))
         v = view.transform(self.center)
         painter.drawEllipse(int(v[0] - r[0]), int(v[1] - r[1]), r[0] * 2, r[1] * 2)
 
@@ -218,6 +219,6 @@ for obj in scene.objects:
         obj.vel = [0., 0.]
         obj.accel = np.array([0., 0.])
     else:
-        obj.accel = np.array([0., -0.2])
+        obj.accel = np.array([0., -.5])
 scene.show()
 app.exec()
