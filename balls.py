@@ -149,7 +149,7 @@ class Physics:
             obj2.center = x2 + dt * u2
 
     def ball_wall(self, ball: Ball, wall: Wall):
-        e = np.array([wall.norm[1], wall.norm[0]])
+        e = np.array([wall.norm[1], - wall.norm[0]])
         d = ball.center - wall.center
         if np.abs(d.dot(e)) < wall.len * 0.5 and 0 < d.dot(wall.norm) < ball.radius:
             # inside envelope rectangle
