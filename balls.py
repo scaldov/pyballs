@@ -5,6 +5,7 @@ import numpy as np
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+import argparse
 
 
 class Ball:
@@ -20,9 +21,12 @@ class View:
         self.linear = np.array([[1.0, 0.0], [0.0, 1.0]])
         self.translate = np.array([0.0, 0.0])
 
-    def set(self, w, h):
-        s = min(w, h)
-        self.translate = np.array([w / 2, h / 2])
+    def set(self, w, h, xres, yres):
+        if w * yres > h * xres:
+            s = h / yres
+        else:
+            s = w / xres
+        self.translate = np.array([w / 2,  h / 2])
         self.linear = np.array([[s / 2, 0.], [0., -s / 2]])
 
     def transform(self, v):
@@ -145,20 +149,37 @@ class Physics:
             obj2.center = x2 + dt * u2
 
     def ball_wall(self, ball: Ball, wall: Wall):
-        nv = ball.vel / np.linalg.norm(ball.vel)
-        sect = ball.center - ball.radius * wall.norm
-        if((sect - wall.center).dot(wall.norm)) < 0.0:
-            if np.linalg.norm(sect - wall.center) > (0.5 * wall.len + ball.radius):
-                return
-            else:
-                ball.vel = ball.vel - 2.0 * wall.norm * ball.vel.dot(wall.norm)
-                ball.center = ball.center - wall.norm * ((ball.center - wall.center).dot(wall.norm) - ball.radius)
+        e = np.array([wall.norm[1], wall.norm[0]])
+        d = ball.center - wall.center
+        if np.abs(d.dot(e)) < wall.len * 0.5 and 0 < d.dot(wall.norm) < ball.radius:
+            # inside envelope rectangle
+            ball.vel = ball.vel - 2.0 * wall.norm * ball.vel.dot(wall.norm)
+            ball.center = ball.center - wall.norm * ((ball.center - wall.center).dot(wall.norm) - ball.radius)
+        else: # maybe around corners
+            p1 = wall.center + e * wall.len * 0.5
+            p2 = wall.center - e * wall.len * 0.5
+            d1 = ball.center - p1
+            d2 = ball.center - p2
+            r2 = ball.radius ** 2
+            if d1.dot(d1) < r2:
+                # corner 1
+                n = d1 / np.linalg.norm(d1)
+                ball.vel = ball.vel - 2.0 * n * ball.vel.dot(n)
+                ball.center = ball.center - n * ((ball.center - p1).dot(n) - ball.radius)
+            elif d2.dot(d2) < r2:
+                #corner 2
+                n = d2 / np.linalg.norm(d2)
+                ball.vel = ball.vel - 2.0 * n * ball.vel.dot(n)
+                ball.center = ball.center - n * ((ball.center - p2).dot(n) - ball.radius)
+                
 
 
 class Scene(QWidget):
-    def __init__(self, **kwargs):
-        # super().__init__(self, *args)
-        QWidget.__init__(self, **kwargs)
+    def __init__(self, xres, yres):
+        super().__init__()
+        self.xres = xres
+        self.yres = yres
+        # QWidget.__init__(self, **kwargs)
         self.objects = list()
         self.timer = QTimer()
         self.timer.timeout.connect(self.timerEvent)
@@ -186,13 +207,18 @@ class Scene(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         view = View()
-        view.set(painter.device().width(), painter.device().height())
+        view.set(painter.device().width(), painter.device().height(), self.xres, self.yres)
         for o in self.objects:
             o.draw(painter, view)
         painter.end()
 
+parser = argparse.ArgumentParser()
+parser.add_argument('-x', '--xres', help='x resolution', required = False, default = 1.)
+parser.add_argument('-y', '--yres', help='x resolution', required = False, default = 1.)
+args, unknown_args = parser.parse_known_args()
+
 app = QApplication([])
-scene = Scene()
+scene = Scene(float(args.xres), float(args.yres))
 scene.objects.append(Ball(radius=0.1, vel=[0.2, 1.0], center=[0.2, 0.5]))
 scene.objects.append(Ball(radius=0.1, vel=[0.3, 1.0], center=[0.4, 0.5]))
 scene.objects.append(Ball(radius=0.1, vel=[0.22, 0.7], center=[-0.2, 0.5]))
